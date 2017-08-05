@@ -39,7 +39,7 @@ shinyServer(function(input, output) {
     b3  <- reactive(1)
     b4  <- reactive(1)
     
-    n <- 10^2
+    n <- 10^3
     
     dat <- reactive({
         # Take care of the random seed.
@@ -76,10 +76,20 @@ shinyServer(function(input, output) {
         dat    
     })
 
-    output$showtabOrig <- renderPrint({
+    output$showtabTreated <- renderPrint({
+        print(table(dat()$xd))    
+    })
+    output$showtabOutcome <- renderPrint({
         print(table(dat()$y))    
     })
 
+    
+    ################################################################
+    ################################################################
+    ########### Logistic models ####################################
+    ################################################################
+    ################################################################
+    
     fitx1x2 <- reactive({
         myfit <- glm(y ~ xd + x1 + x2,
             family= binomial(link= mylink()),
@@ -102,19 +112,36 @@ shinyServer(function(input, output) {
         myfit
     })
     
-    getLPs <- function(fit) {
-        fit$linear.predictors    
-    }
-    lpx1x2 <- reactive({
-        getLPs(fitx1x2())
+    ################################################################
+    ################################################################
+    ########### Linear models ####################################
+    ################################################################
+    ################################################################
+    
+    fitx1x2.lm <- reactive({
+        myfit <- lm(y ~ xd + x1 + x2,
+            data= dat()
+        )        
+        myfit
     })
-    lpx1x2x3 <- reactive({
-        getLPs(fitx1x2x3())
+    fitx1x2x3.lm <- reactive({
+        myfit <- lm(y ~ xd + x1 + x2 + x3,
+            data= dat()
+        )        
+        myfit
+    })
+    fitx1x2x3x4.lm <- reactive({
+        myfit <- lm(y ~ xd + x1 + x2 + x3 + x4,
+            data= dat()
+        )        
+        myfit
     })
     
-    lpx1x2x3x4 <- reactive({
-        getLPs(fitx1x2x3x4())
-    })
+    ################################################################
+    ################################################################
+    ########### Marginal differences ###############################
+    ################################################################
+    ################################################################
     
     makeMargDiffs.xd <- function(dat, fit) {
         d1 <- dat
@@ -137,27 +164,49 @@ shinyServer(function(input, output) {
         makeMargDiffs.xd(dat(), fitx1x2x3x4())
     })
     
-    getORAndCI <- function(fit, vname) {
+    ################################################################
+    ################################################################
+    ########### Estimates and CIs ###############################
+    ################################################################
+    ################################################################
+    
+    getEstAndCI <- function(fit, vname, wantExp) {
         est <- coef(fit)[vname]
         se <- sqrt(vcov(fit)[vname, vname])
-        exp(c(est, est - Z975 * se, est + Z975 * se))
+        res <- c(est, est - Z975 * se, est + Z975 * se)
+        if (wantExp) exp(res) else res
     }
-    
-    getORsAndCIs <- function(f1, f2, f3, vname) {
+    getEstsAndCIs <- function(f1, f2, f3, f1.lm, f2.lm, f3.lm, vname) {
         mydat <- data.frame(rbind(
-            getORAndCI(f1, vname),   
-            getORAndCI(f2, vname),    
-            getORAndCI(f3, vname)    
-        ))
-        names(mydat) <- c("OR", "LB", "UB")
+            c(getEstAndCI(f1, vname, wantExp= TRUE), "Logistic"),   
+            c(getEstAndCI(f2, vname, wantExp= TRUE), "Logistic"),    
+            c(getEstAndCI(f3, vname, wantExp= TRUE), "Logistic"),   
+            c(getEstAndCI(f1.lm, vname, wantExp= FALSE), "Linear"),   
+            c(getEstAndCI(f2.lm, vname, wantExp= FALSE), "Linear"),    
+            c(getEstAndCI(f3.lm, vname, wantExp= FALSE), "Linear")    
+        ), stringsAsFactors= FALSE)
+        names(mydat) <- c("Est", "LB", "UB", "Type")
+        mydat <- within(mydat, {
+            Est <- as.numeric(Est)    
+            LB <- as.numeric(LB)    
+            UB <- as.numeric(UB)    
+        })
         
         # assuming these correspond to f1 f2 f3 
-        mydat$fit <- c("x1x2", "x1x2x3", "x1x2x3x4")
+        mydat$fit <- rep(c("x1x2", "x1x2x3", "x1x2x3x4"), 2)
         
+        #print(str(mydat))
         mydat
     }
-    ORsAndCIs.xd <- reactive({
-        getORsAndCIs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), "xd")
+    EstsAndCIs.x1 <- reactive({
+        getEstsAndCIs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), 
+            fitx1x2.lm(), fitx1x2x3.lm(), fitx1x2x3x4.lm(), 
+            "x1")
+    })
+    EstsAndCIs.xd <- reactive({
+        getEstsAndCIs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), 
+            fitx1x2.lm(), fitx1x2x3.lm(), fitx1x2x3x4.lm(), 
+            "xd")
     })
     
     output$showResOrig <- renderPrint({
@@ -170,7 +219,14 @@ shinyServer(function(input, output) {
         print(mean(margDiffsx1x2x3.xd()))    
         print(mean(margDiffsx1x2x3x4.xd()))    
     })
-    makePred <- function(dat, fit) {
+    
+    ################################################################
+    ################################################################
+    ########### Predicted probabilitie##############################
+    ################################################################
+    ################################################################
+    
+    makeNewdat <- function(dat) {
         mylen <- 100
         xd <- 0:1
         x1 <- seq(min(dat$x1), max(dat$x1), length.out= mylen)
@@ -181,6 +237,12 @@ shinyServer(function(input, output) {
             x3 <- rep(median(dat$x3), nr)
             x4 <- rep(median(dat$x4), nr)
         })
+        nd
+    }
+    newdat <- reactive({
+        makeNewdat(dat())    
+    })
+    makePred <- function(nd, fit, fitname) {
         pred1 <- predict(fit, 
             newdata= nd,
             type= "response",
@@ -191,26 +253,35 @@ shinyServer(function(input, output) {
             lower <- yhat - Z975 * pred1$se.fit
             upper <- yhat + Z975 * pred1$se.fit
             xd <- factor(xd)
+            fit <- fitname
         })
+        #cat(str(nd))
         nd
     }
-    predx1x2 <- reactive({
-        dat <- makePred(dat(), fitx1x2())
-        dat$fit <- "x1x2"
-        dat
-    })
-    predx1x2x3 <- reactive({
-        dat <- makePred(dat(), fitx1x2x3())
-        dat$fit <- "x1x2x3"
-        dat
-    })
-    predx1x2x3x4 <- reactive({
-        dat <- makePred(dat(), fitx1x2x3x4())
-        dat$fit <- "x1x2x3x4"
-        dat
-    })
+    allPreds <- function(nd, f1, f2, f3, f1.lm, f2.lm, f3.lm, vname) {
+        mydat.logistic <- data.frame(rbind(
+            makePred(nd, f1, "x1x2"),   
+            makePred(nd, f2, "x1x2x3"),    
+            makePred(nd, f3, "x1x2x3x4")
+        ), stringsAsFactors= FALSE)
+        mydat.logistic$Type <- "Logistic"
+        #cat(str(mydat.logistic))
+        
+        mydat.linear <- data.frame(rbind(
+            makePred(nd, f1.lm, "x1x2"),   
+            makePred(nd, f2.lm, "x1x2x3"),    
+            makePred(nd, f3.lm, "x1x2x3x4")    
+        ), stringsAsFactors= FALSE)
+        mydat.linear$Type <- "Linear"
+        
+        mydat <- rbind(mydat.logistic, mydat.linear)
+        #cat(str(mydat))
+        mydat
+    }
     stackedPredDat <- reactive({
-        rbind(predx1x2(), predx1x2x3(), predx1x2x3x4())
+        allPreds(newdat(), fitx1x2(), fitx1x2x3(), fitx1x2x3x4(),
+            fitx1x2.lm(), fitx1x2x3.lm(), fitx1x2x3x4.lm(),
+            "xd")
     })
     
     ##########################################################
@@ -219,14 +290,12 @@ shinyServer(function(input, output) {
     ##########################################################
     ##########################################################
     
-    output$rawPlot.x1 <- renderPlot({
-        
+    output$ystarHist <- renderPlot({
         ggplot(data= dat(),
-            mapping= aes(x= x1, y= ystar, shape= Treated, linetype= Treated)) +
-            geom_point() +
-            # TODO: this isn't right
-            geom_smooth(method= "lm") +
-            geom_hline(yintercept= 0, colour= "red") +
+            mapping= aes(x= ystar)) +
+            geom_histogram(bins= 30) +
+            geom_vline(xintercept= 0, colour= "red") +
+            xlab("Y* (underlying continuous variable)") +
             theme_bw()
     })
     
@@ -245,11 +314,12 @@ shinyServer(function(input, output) {
             xlab("x1, with other continuous covariate(s) fixed") +
             ylab("Predicted probability") +
             ylim(-0.1, 1.1) +
-            theme_bw()
+            theme_bw() +
+            facet_wrap(~ Type, ncol= 2)
     })
     output$predPlot.xd <- renderPlot({
         mydat <- stackedPredDat() %>%
-            group_by(fit, xd) %>%
+            group_by(Type, fit, xd) %>%
             slice(floor(n()/2))%>%
             ungroup()
             
@@ -264,17 +334,29 @@ shinyServer(function(input, output) {
             xlab("xd, with other covariate(s) fixed") +
             ylab("Predicted probability") +
             ylim(-0.1, 1.1) +
-            theme_bw()
+            theme_bw() +
+            facet_wrap(~ Type, ncol= 2)
     })
 
-    output$resPlot.xd <- renderPlot({
-        ggplot(data= ORsAndCIs.xd(),
-            mapping= aes(x= fit, y= OR, ymin= LB, ymax= UB, colour= fit)) +
+    output$resPlot.x1 <- renderPlot({
+        ggplot(data= EstsAndCIs.x1(),
+            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
             scale_colour_manual("Model", values= my.colorscale.3) +
-            geom_linerange() +
-            geom_point(size= 2) +
-            ylab("OR for xd, with 95% CI") +
-            theme_bw()
+            geom_pointrange(size= 2) +
+            xlab(NULL) +
+            ylab("Beta or OR for x1, with 95% CI") +
+            theme_bw() +
+            facet_wrap(~ Type, ncol= 2, scales= "free_y")
+    })
+    output$resPlot.xd <- renderPlot({
+        ggplot(data= EstsAndCIs.xd(),
+            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
+            scale_colour_manual("Model", values= my.colorscale.3) +
+            geom_pointrange(size= 2) +
+            xlab(NULL) +
+            ylab("Beta or OR for xd, with 95% CI") +
+            theme_bw() +
+            facet_wrap(~ Type, ncol= 2, scales= "free_y")
     })
 
 })

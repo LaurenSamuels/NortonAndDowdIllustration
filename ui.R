@@ -24,16 +24,21 @@ shinyUI(fluidPage(
                 min = 0,
                 max = 1,
                 value = 0.5
-            )
+            ),
+            plotOutput("ystarHist"),
+            h6("Treatment groups:"),
+            verbatimTextOutput("showtabTreated"),
+            h6("Outcomes:"),
+            verbatimTextOutput("showtabOutcome")
         ), # end panel
     
-        # Show a plot of the generated distribution
         mainPanel(
-            plotOutput("rawPlot.x1"),
-            h6("Breakdown of treatment groups:"),
-            verbatimTextOutput("showtabOrig"),
             plotOutput("predPlot.x1"),
+            tags$hr(),
             plotOutput("predPlot.xd"),
+            tags$hr(),
+            plotOutput("resPlot.x1"),
+            tags$hr(),
             plotOutput("resPlot.xd")
 
         )
