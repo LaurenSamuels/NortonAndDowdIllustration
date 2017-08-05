@@ -7,6 +7,16 @@ shinyUI(fluidPage(
     # Sidebar with a slider input for number of bins
     sidebarLayout(
         sidebarPanel(
+            sliderInput("propTx",
+                "Proportion treated:",
+                min = 0,
+                max = 1,
+                value = 0.5
+            ),
+            h6("Treatment groups:"),
+            verbatimTextOutput("showtabTreated"),
+            tags$hr(),
+            tags$hr(),
             sliderInput("beta0",
                 "Intercept for underlying continuous variable (higher intercept -> more outcome events):",
                 min = -6,
@@ -19,15 +29,7 @@ shinyUI(fluidPage(
                 max = 3,
                 value = 1
             ),
-            sliderInput("propTx",
-                "Proportion treated:",
-                min = 0,
-                max = 1,
-                value = 0.5
-            ),
             plotOutput("ystarHist"),
-            h6("Treatment groups:"),
-            verbatimTextOutput("showtabTreated"),
             h6("Outcomes:"),
             verbatimTextOutput("showtabOutcome")
         ), # end panel
@@ -39,9 +41,7 @@ shinyUI(fluidPage(
             plotOutput("resPlot.xd"),
             tags$hr(),
             h4("Predicted probabilities"),
-            plotOutput("predPlot.x1"),
-            tags$hr(),
-            plotOutput("predPlot.xd")
+            plotOutput("predPlot.x1")
 
         )
     ) # end sidebarLayout

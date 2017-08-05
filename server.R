@@ -33,13 +33,14 @@ shinyServer(function(input, output) {
     )
     
     b0  <- reactive(input$beta0)
-    bd  <- reactive(1)
+    # From N&D p12, footnote to table 1
+    bd  <- reactive(0.5)
     b1  <- reactive(1)
-    b2  <- reactive(1)
+    b2  <- reactive(2)
     b3  <- reactive(1)
-    b4  <- reactive(1)
+    b4  <- reactive(3)
     
-    n <- 10^3
+    n <- 10^4
     
     dat <- reactive({
         # Take care of the random seed.
@@ -307,8 +308,7 @@ shinyServer(function(input, output) {
                 colour= fit, fill= fit, linetype= xd)) +
             scale_colour_manual("Model", values= my.colorscale.3) +
             scale_fill_manual("Model", values= my.colorscale.3) +
-            scale_linetype_manual("Treated", 
-                values= c('solid', 'dotted')) +
+            scale_linetype_manual("xd", values= c('solid', 'dotted')) +
             geom_ribbon(colour= NA, alpha= 0.5) +
             geom_line(size= 1.5) +
             xlab("x1") +
@@ -348,6 +348,8 @@ shinyServer(function(input, output) {
             theme_bw() +
             facet_wrap(~ Type, ncol= 2)
     })
+    
+    # not currently using this one
     output$resPlot.xd <- renderPlot({
         ggplot(data= EstsAndCIs.xd(),
             mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
