@@ -8,7 +8,7 @@ shinyUI(fluidPage(
     sidebarLayout(
         sidebarPanel(
             sliderInput("propTx",
-                "Proportion treated:",
+                "Proportiont treated:",
                 min = 0,
                 max = 1,
                 value = 0.5
