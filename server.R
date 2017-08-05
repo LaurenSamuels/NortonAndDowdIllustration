@@ -309,11 +309,11 @@ shinyServer(function(input, output) {
             scale_fill_manual("Model", values= my.colorscale.3) +
             scale_linetype_manual("Treated", 
                 values= c('solid', 'dotted')) +
-            geom_ribbon(colour= NA, alpha= 0.2) +
-            geom_line(size= 1) +
-            xlab("x1, with other continuous covariate(s) fixed") +
-            ylab("Predicted probability") +
-            ylim(-0.1, 1.1) +
+            geom_ribbon(colour= NA, alpha= 0.5) +
+            geom_line(size= 1.5) +
+            xlab("x1") +
+            ylab("Predicted probability, with other continuous covariate(s) fixed") +
+            ylim(-0.2, 1.2) +
             theme_bw() +
             facet_wrap(~ Type, ncol= 2)
     })
@@ -328,12 +328,12 @@ shinyServer(function(input, output) {
                 colour= fit, size= fit)) +
             scale_colour_manual("Model", values= my.colorscale.3) +
             scale_size_manual("Model", 
-                values= c(2.5, 2, 1)) +
+                values= c(3, 2, 1)) +
             geom_linerange(alpha= 0.5) +
-            geom_point(size= 2) +
-            xlab("xd, with other covariate(s) fixed") +
-            ylab("Predicted probability") +
-            ylim(-0.1, 1.1) +
+            geom_point() +
+            xlab("xd") +
+            ylab("Predicted probability, with other covariate(s) fixed") +
+            ylim(-0.2, 1.2) +
             theme_bw() +
             facet_wrap(~ Type, ncol= 2)
     })
@@ -342,21 +342,21 @@ shinyServer(function(input, output) {
         ggplot(data= EstsAndCIs.x1(),
             mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
             scale_colour_manual("Model", values= my.colorscale.3) +
-            geom_pointrange(size= 2) +
+            geom_pointrange(size= 1) +
             xlab(NULL) +
             ylab("Beta or OR for x1, with 95% CI") +
             theme_bw() +
-            facet_wrap(~ Type, ncol= 2, scales= "free_y")
+            facet_wrap(~ Type, ncol= 2)
     })
     output$resPlot.xd <- renderPlot({
         ggplot(data= EstsAndCIs.xd(),
             mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
             scale_colour_manual("Model", values= my.colorscale.3) +
-            geom_pointrange(size= 2) +
+            geom_pointrange(size= 1) +
             xlab(NULL) +
             ylab("Beta or OR for xd, with 95% CI") +
             theme_bw() +
-            facet_wrap(~ Type, ncol= 2, scales= "free_y")
+            facet_wrap(~ Type, ncol= 2)
     })
 
 })

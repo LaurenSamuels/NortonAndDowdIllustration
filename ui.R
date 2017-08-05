@@ -33,13 +33,15 @@ shinyUI(fluidPage(
         ), # end panel
     
         mainPanel(
-            plotOutput("predPlot.x1"),
-            tags$hr(),
-            plotOutput("predPlot.xd"),
-            tags$hr(),
+            h4("Coefficient estimates"),
             plotOutput("resPlot.x1"),
             tags$hr(),
-            plotOutput("resPlot.xd")
+            plotOutput("resPlot.xd"),
+            tags$hr(),
+            h4("Predicted probabilities"),
+            plotOutput("predPlot.x1"),
+            tags$hr(),
+            plotOutput("predPlot.xd")
 
         )
     ) # end sidebarLayout
