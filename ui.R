@@ -8,13 +8,13 @@ shinyUI(fluidPage(
     sidebarLayout(
         sidebarPanel(
             sliderInput("beta0",
-                "Intercept for underlying regression:",
+                "Intercept for underlying continuous variable (higher intercept -> more outcome events):",
                 min = -6,
                 max = 6,
                 value = 0
             ),
             sliderInput("errSD",
-                "SD of error for underlying regression:",
+                "SD of error for underlying continuous variable:",
                 min = 0.01,
                 max = 3,
                 value = 1
@@ -29,11 +29,12 @@ shinyUI(fluidPage(
     
         # Show a plot of the generated distribution
         mainPanel(
-            plotOutput("predPlot"),
+            plotOutput("rawPlot.x1"),
             h6("Breakdown of treatment groups:"),
             verbatimTextOutput("showtabOrig"),
-            h6("Results from regressions:"),
-            verbatimTextOutput("showResOrig")
+            plotOutput("predPlot.x1"),
+            plotOutput("predPlot.xd"),
+            plotOutput("resPlot.xd")
 
         )
     ) # end sidebarLayout

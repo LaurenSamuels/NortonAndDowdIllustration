@@ -8,10 +8,17 @@
 library(shiny)
 library(ggplot2)
 library(rms)
+library(dplyr)
 
 shinyServer(function(input, output) {
 
     Z975 <- qnorm(0.975)
+    
+    # Color scales
+    # CB-friendly, from colorbrewer2
+    my.colorscale.2 <- c("#7570b3", "#d95f02")
+    my.colorscale.3 <- c("#d95f02", "#1b9e77", "#7570b3")
+    my.colorscale.4 <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c')
     
     #myseed <- reactive(input$randseed)
     myseed <- reactive(
@@ -31,7 +38,6 @@ shinyServer(function(input, output) {
     b2  <- reactive(1)
     b3  <- reactive(1)
     b4  <- reactive(1)
-    
     
     n <- 10^2
     
@@ -62,6 +68,7 @@ shinyServer(function(input, output) {
         dat <- data.frame(x0, xd, x1, x2, x3, x4, err)
         multvec <- c(b0(), bd(), b1(), b2(), b3(), b4(), 1)
         dat <- within(dat, {
+            Treated <- factor(xd)
             ystar <- as.matrix(dat) %*% multvec
             y <- as.numeric(ystar > 0)
         })
@@ -73,14 +80,21 @@ shinyServer(function(input, output) {
         print(table(dat()$y))    
     })
 
-    fitOrig <- reactive({
+    fitx1x2 <- reactive({
         myfit <- glm(y ~ xd + x1 + x2,
             family= binomial(link= mylink()),
             data= dat()
         )        
         myfit
     })
-    fitFull <- reactive({
+    fitx1x2x3 <- reactive({
+        myfit <- glm(y ~ xd + x1 + x2 + x3,
+            family= binomial(link= mylink()),
+            data= dat()
+        )        
+        myfit
+    })
+    fitx1x2x3x4 <- reactive({
         myfit <- glm(y ~ xd + x1 + x2 + x3 + x4,
             family= binomial(link= mylink()),
             data= dat()
@@ -91,14 +105,18 @@ shinyServer(function(input, output) {
     getLPs <- function(fit) {
         fit$linear.predictors    
     }
-    lpOrig <- reactive({
-        getLPs(fitOrig())
+    lpx1x2 <- reactive({
+        getLPs(fitx1x2())
     })
-    lpFull <- reactive({
-        getLPs(fitFull())
+    lpx1x2x3 <- reactive({
+        getLPs(fitx1x2x3())
     })
     
-    makeMargDiffs <- function(dat, fit) {
+    lpx1x2x3x4 <- reactive({
+        getLPs(fitx1x2x3x4())
+    })
+    
+    makeMargDiffs.xd <- function(dat, fit) {
         d1 <- dat
         d1$xd <- rep(1, n)
         p1 <- predict(fit, newdata= d1, type= "response", se.fit= FALSE) 
@@ -109,20 +127,48 @@ shinyServer(function(input, output) {
         
         p1 - p0
     }
-    margDiffsOrig <- reactive({
-        makeMargDiffs(dat(), fitOrig())
+    margDiffsx1x2.xd <- reactive({
+        makeMargDiffs.xd(dat(), fitx1x2())
     })
-    margDiffsFull <- reactive({
-        makeMargDiffs(dat(), fitFull())
+    margDiffsx1x2x3.xd <- reactive({
+        makeMargDiffs.xd(dat(), fitx1x2x3())
+    })
+    margDiffsx1x2x3x4.xd <- reactive({
+        makeMargDiffs.xd(dat(), fitx1x2x3x4())
+    })
+    
+    getORAndCI <- function(fit, vname) {
+        est <- coef(fit)[vname]
+        se <- sqrt(vcov(fit)[vname, vname])
+        exp(c(est, est - Z975 * se, est + Z975 * se))
+    }
+    
+    getORsAndCIs <- function(f1, f2, f3, vname) {
+        mydat <- data.frame(rbind(
+            getORAndCI(f1, vname),   
+            getORAndCI(f2, vname),    
+            getORAndCI(f3, vname)    
+        ))
+        names(mydat) <- c("OR", "LB", "UB")
+        
+        # assuming these correspond to f1 f2 f3 
+        mydat$fit <- c("x1x2", "x1x2x3", "x1x2x3x4")
+        
+        mydat
+    }
+    ORsAndCIs.xd <- reactive({
+        getORsAndCIs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), "xd")
     })
     
     output$showResOrig <- renderPrint({
-        #print(fitOrig())
+        #print(fitx1x2())
         # TODO: convert to table
-        print(exp(coef(fitOrig())["xd"]))
-        print(exp(coef(fitFull())["xd"]))
-        print(mean(margDiffsOrig()))    
-        print(mean(margDiffsFull()))    
+        print(exp(coef(fitx1x2())["xd"]))
+        print(exp(coef(fitx1x2x3())["xd"]))
+        print(exp(coef(fitx1x2x3x4())["xd"]))
+        print(mean(margDiffsx1x2.xd()))    
+        print(mean(margDiffsx1x2x3.xd()))    
+        print(mean(margDiffsx1x2x3x4.xd()))    
     })
     makePred <- function(dat, fit) {
         mylen <- 100
@@ -139,7 +185,7 @@ shinyServer(function(input, output) {
             newdata= nd,
             type= "response",
             se.fit= TRUE) 
-        cat(str(pred1))
+        #cat(str(pred1))
         nd <- within(nd, {
             yhat <- pred1$fit
             lower <- yhat - Z975 * pred1$se.fit
@@ -148,26 +194,86 @@ shinyServer(function(input, output) {
         })
         nd
     }
-    predOrig <- reactive({
-        dat <- makePred(dat(), fitOrig())
-        dat$fit <- "Orig"
+    predx1x2 <- reactive({
+        dat <- makePred(dat(), fitx1x2())
+        dat$fit <- "x1x2"
         dat
     })
-    predFull <- reactive({
-        dat <- makePred(dat(), fitFull())
-        dat$fit <- "Full"
+    predx1x2x3 <- reactive({
+        dat <- makePred(dat(), fitx1x2x3())
+        dat$fit <- "x1x2x3"
         dat
+    })
+    predx1x2x3x4 <- reactive({
+        dat <- makePred(dat(), fitx1x2x3x4())
+        dat$fit <- "x1x2x3x4"
+        dat
+    })
+    stackedPredDat <- reactive({
+        rbind(predx1x2(), predx1x2x3(), predx1x2x3x4())
     })
     
+    ##########################################################
+    ##########################################################
+    #############  Plots #####################################
+    ##########################################################
+    ##########################################################
+    
+    output$rawPlot.x1 <- renderPlot({
+        
+        ggplot(data= dat(),
+            mapping= aes(x= x1, y= ystar, shape= Treated, linetype= Treated)) +
+            geom_point() +
+            # TODO: this isn't right
+            geom_smooth(method= "lm") +
+            geom_hline(yintercept= 0, colour= "red") +
+            theme_bw()
+    })
+    
+    
     # TODO: next do same for linear probability model
-    output$predPlot <- renderPlot({
-        ggplot(data= rbind(predOrig(), predFull()),
+    output$predPlot.x1 <- renderPlot({
+        ggplot(data= stackedPredDat(),
             mapping= aes(x= x1, y= yhat, ymin= lower, ymax= upper, 
-                colour= xd, fill= xd, linetype= fit)) +
+                colour= fit, fill= fit, linetype= xd)) +
+            scale_colour_manual("Model", values= my.colorscale.3) +
+            scale_fill_manual("Model", values= my.colorscale.3) +
+            scale_linetype_manual("Treated", 
+                values= c('solid', 'dotted')) +
             geom_ribbon(colour= NA, alpha= 0.2) +
-            geom_line() +
+            geom_line(size= 1) +
+            xlab("x1, with other continuous covariate(s) fixed") +
             ylab("Predicted probability") +
             ylim(-0.1, 1.1) +
+            theme_bw()
+    })
+    output$predPlot.xd <- renderPlot({
+        mydat <- stackedPredDat() %>%
+            group_by(fit, xd) %>%
+            slice(floor(n()/2))%>%
+            ungroup()
+            
+        ggplot(data= mydat,
+            mapping= aes(x= xd, y= yhat, ymin= lower, ymax= upper, 
+                colour= fit, size= fit)) +
+            scale_colour_manual("Model", values= my.colorscale.3) +
+            scale_size_manual("Model", 
+                values= c(2.5, 2, 1)) +
+            geom_linerange(alpha= 0.5) +
+            geom_point(size= 2) +
+            xlab("xd, with other covariate(s) fixed") +
+            ylab("Predicted probability") +
+            ylim(-0.1, 1.1) +
+            theme_bw()
+    })
+
+    output$resPlot.xd <- renderPlot({
+        ggplot(data= ORsAndCIs.xd(),
+            mapping= aes(x= fit, y= OR, ymin= LB, ymax= UB, colour= fit)) +
+            scale_colour_manual("Model", values= my.colorscale.3) +
+            geom_linerange() +
+            geom_point(size= 2) +
+            ylab("OR for xd, with 95% CI") +
             theme_bw()
     })
 
