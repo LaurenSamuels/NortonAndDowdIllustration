@@ -9,6 +9,7 @@ library(shiny)
 library(ggplot2)
 library(rms)
 library(dplyr)
+library(margins)
 
 shinyServer(function(input, output) {
 
@@ -140,29 +141,55 @@ shinyServer(function(input, output) {
     
     ################################################################
     ################################################################
-    ########### Marginal differences ###############################
+    ########### Marginal effectss ###############################
     ################################################################
     ################################################################
     
-    makeMargDiffs.xd <- function(dat, fit) {
-        d1 <- dat
-        d1$xd <- rep(1, n)
-        p1 <- predict(fit, newdata= d1, type= "response", se.fit= FALSE) 
-        
-        d0 <- dat
-        d0$xd <- rep(0, n)
-        p0 <- predict(fit, newdata= d0, type= "response", se.fit= FALSE) 
-        
-        p1 - p0
+    getAveMargDiff <- function(fit, vname, wantExp) {
+        if (wantExp) {
+            m <- margins(fit, type= "response")
+        } else {
+            m <- margins(fit)
+        }
+        msum <- summary(m)
+        est <- msum[msum$factor == vname, "AME"]
+        #print(est)
+        se  <- msum[msum$factor == vname, "SE"]
+        res <- c(est, est - Z975 * se, est + Z975 * se)
+        #print(res)
+        res
     }
-    margDiffsx1x2.xd <- reactive({
-        makeMargDiffs.xd(dat(), fitx1x2())
+    getAveMargDiffs <- function(f1, f2, f3, f1.lm, f2.lm, f3.lm, vname) {
+        mydat <- data.frame(rbind(
+            c(getAveMargDiff(f1, vname, wantExp= TRUE), "Logistic"),   
+            c(getAveMargDiff(f2, vname, wantExp= TRUE), "Logistic"),    
+            c(getAveMargDiff(f3, vname, wantExp= TRUE), "Logistic"),   
+            c(getAveMargDiff(f1.lm, vname, wantExp= FALSE), "Linear"),   
+            c(getAveMargDiff(f2.lm, vname, wantExp= FALSE), "Linear"),    
+            c(getAveMargDiff(f3.lm, vname, wantExp= FALSE), "Linear")    
+        ), stringsAsFactors= FALSE)
+        names(mydat) <- c("Est", "LB", "UB", "Type")
+        mydat <- within(mydat, {
+            Est <- as.numeric(Est)    
+            LB <- as.numeric(LB)    
+            UB <- as.numeric(UB)    
+        })
+        
+        # assuming these correspond to f1 f2 f3 
+        mydat$fit <- rep(c("x1x2", "x1x2x3", "x1x2x3x4"), 2)
+        
+        #print(str(mydat))
+        mydat
+    }
+    aveMargDiffs.x1 <- reactive({
+        getAveMargDiffs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), 
+            fitx1x2.lm(), fitx1x2x3.lm(), fitx1x2x3x4.lm(), 
+            "x1")
     })
-    margDiffsx1x2x3.xd <- reactive({
-        makeMargDiffs.xd(dat(), fitx1x2x3())
-    })
-    margDiffsx1x2x3x4.xd <- reactive({
-        makeMargDiffs.xd(dat(), fitx1x2x3x4())
+    aveMargDiffs.xd <- reactive({
+        getAveMargDiffs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), 
+            fitx1x2.lm(), fitx1x2x3.lm(), fitx1x2x3x4.lm(), 
+            "xd")
     })
     
     ################################################################
@@ -210,16 +237,6 @@ shinyServer(function(input, output) {
             "xd")
     })
     
-    output$showResOrig <- renderPrint({
-        #print(fitx1x2())
-        # TODO: convert to table
-        print(exp(coef(fitx1x2())["xd"]))
-        print(exp(coef(fitx1x2x3())["xd"]))
-        print(exp(coef(fitx1x2x3x4())["xd"]))
-        print(mean(margDiffsx1x2.xd()))    
-        print(mean(margDiffsx1x2x3.xd()))    
-        print(mean(margDiffsx1x2x3x4.xd()))    
-    })
     
     ################################################################
     ################################################################
@@ -297,11 +314,11 @@ shinyServer(function(input, output) {
             geom_histogram(bins= 30) +
             geom_vline(xintercept= 0, colour= "red") +
             xlab("Y* (underlying continuous variable)") +
+            xlim(-35, 35) +
             theme_bw()
     })
     
     
-    # TODO: next do same for linear probability model
     output$predPlot.x1 <- renderPlot({
         ggplot(data= stackedPredDat(),
             mapping= aes(x= x1, y= yhat, ymin= lower, ymax= upper, 
@@ -361,4 +378,26 @@ shinyServer(function(input, output) {
             facet_wrap(~ Type, ncol= 2)
     })
 
+    output$aveMargDiffPlot.x1 <- renderPlot({
+        ggplot(data= aveMargDiffs.x1(),
+            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
+            scale_colour_manual("Model", values= my.colorscale.3) +
+            geom_pointrange(size= 1) +
+            xlab(NULL) +
+            ylab("Average marginal (incremental) effect for x1, with 95% CI") +
+            theme_bw() +
+            facet_wrap(~ Type, ncol= 2)
+    })
+    
+    output$aveMargDiffPlot.xd <- renderPlot({
+        ggplot(data= aveMargDiffs.xd(),
+            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
+            scale_colour_manual("Model", values= my.colorscale.3) +
+            geom_pointrange(size= 1) +
+            xlab(NULL) +
+            ylab("Average marginal effect for xd, with 95% CI") +
+            theme_bw() +
+            facet_wrap(~ Type, ncol= 2)
+    })
+    
 })

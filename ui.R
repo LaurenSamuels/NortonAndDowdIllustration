@@ -24,7 +24,7 @@ shinyUI(fluidPage(
                 value = 0
             ),
             sliderInput("errSD",
-                "SD of error for underlying continuous variable:",
+                "SD of error for underlying continuous variable (coefficients are in [0.5, 3]):",
                 min = 0.01,
                 max = 3,
                 value = 1
@@ -41,7 +41,10 @@ shinyUI(fluidPage(
             plotOutput("resPlot.xd"),
             tags$hr(),
             h4("Predicted probabilities"),
-            plotOutput("predPlot.x1")
+            plotOutput("predPlot.x1"),
+            h4("Average marginal effects"),
+            plotOutput("aveMargDiffPlot.x1"),
+            plotOutput("aveMargDiffPlot.xd")
 
         )
     ) # end sidebarLayout
