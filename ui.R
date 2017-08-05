@@ -35,16 +35,13 @@ shinyUI(fluidPage(
         ), # end panel
     
         mainPanel(
-            h4("Coefficient estimates"),
+            h4("Coefficient estimates for x1"),
             plotOutput("resPlot.x1"),
             tags$hr(),
-            plotOutput("resPlot.xd"),
-            tags$hr(),
-            h4("Predicted probabilities"),
+            h4("Predicted probabilities, with other continuous covariate(s) fixed"),
             plotOutput("predPlot.x1"),
-            h4("Average marginal effects"),
-            plotOutput("aveMargDiffPlot.x1"),
-            plotOutput("aveMargDiffPlot.xd")
+            h4("Average marginal effects for x1"),
+            plotOutput("aveMargDiffPlot.x1")
 
         )
     ) # end sidebarLayout

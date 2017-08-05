@@ -61,6 +61,7 @@ shinyServer(function(input, output) {
         x3 <- rnorm(n)
         x4 <- rnorm(n)
         
+        # Note that in their supplement, N&D use a Normal error distribution
         if (mylink() == "logit") {
             err <- rlogis(n, location= 0, scale= mysd())    
         } else {
@@ -145,30 +146,34 @@ shinyServer(function(input, output) {
     ################################################################
     ################################################################
     
-    getAveMargDiff <- function(fit, vname, wantExp) {
-        if (wantExp) {
-            m <- margins(fit, type= "response")
-        } else {
-            m <- margins(fit)
+    getAveMargDiff <- function(dat, fit, vname, wantExp) {
+        res <- matrix(NA, nrow= 2, ncol= 4)
+        for (i in 0:1) {
+            if (wantExp) {
+                m <- margins(fit, type= "response", 
+                    data= dat[dat$xd == i, ])
+            } else {
+                m <- margins(fit, data= dat[dat$xd == i, ])
+            }
+            msum <- summary(m)
+            est <- msum[msum$factor == vname, "AME"]
+            #print(est)
+            se  <- msum[msum$factor == vname, "SE"]
+            res[i + 1, ] <- c(i, est, est - Z975 * se, est + Z975 * se)
         }
-        msum <- summary(m)
-        est <- msum[msum$factor == vname, "AME"]
-        #print(est)
-        se  <- msum[msum$factor == vname, "SE"]
-        res <- c(est, est - Z975 * se, est + Z975 * se)
         #print(res)
         res
     }
-    getAveMargDiffs <- function(f1, f2, f3, f1.lm, f2.lm, f3.lm, vname) {
+    getAveMargDiffs <- function(dat, f1, f2, f3, f1.lm, f2.lm, f3.lm, vname) {
         mydat <- data.frame(rbind(
-            c(getAveMargDiff(f1, vname, wantExp= TRUE), "Logistic"),   
-            c(getAveMargDiff(f2, vname, wantExp= TRUE), "Logistic"),    
-            c(getAveMargDiff(f3, vname, wantExp= TRUE), "Logistic"),   
-            c(getAveMargDiff(f1.lm, vname, wantExp= FALSE), "Linear"),   
-            c(getAveMargDiff(f2.lm, vname, wantExp= FALSE), "Linear"),    
-            c(getAveMargDiff(f3.lm, vname, wantExp= FALSE), "Linear")    
+            cbind(getAveMargDiff(dat, f1, vname, wantExp= TRUE), rep("Logistic", 2)),   
+            cbind(getAveMargDiff(dat, f2, vname, wantExp= TRUE), rep("Logistic", 2)),    
+            cbind(getAveMargDiff(dat, f3, vname, wantExp= TRUE), rep("Logistic", 2)),   
+            cbind(getAveMargDiff(dat, f1.lm, vname, wantExp= FALSE), rep("Linear", 2)),   
+            cbind(getAveMargDiff(dat, f2.lm, vname, wantExp= FALSE), rep("Linear", 2)),    
+            cbind(getAveMargDiff(dat, f3.lm, vname, wantExp= FALSE), rep("Linear", 2))    
         ), stringsAsFactors= FALSE)
-        names(mydat) <- c("Est", "LB", "UB", "Type")
+        names(mydat) <- c("xd", "Est", "LB", "UB", "Type")
         mydat <- within(mydat, {
             Est <- as.numeric(Est)    
             LB <- as.numeric(LB)    
@@ -176,13 +181,13 @@ shinyServer(function(input, output) {
         })
         
         # assuming these correspond to f1 f2 f3 
-        mydat$fit <- rep(c("x1x2", "x1x2x3", "x1x2x3x4"), 2)
+        mydat$fit <- rep(rep(c("x1x2", "x1x2x3", "x1x2x3x4"), each= 2), 2)
         
         #print(str(mydat))
         mydat
     }
     aveMargDiffs.x1 <- reactive({
-        getAveMargDiffs(fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), 
+        getAveMargDiffs(dat(), fitx1x2(), fitx1x2x3(), fitx1x2x3x4(), 
             fitx1x2.lm(), fitx1x2x3.lm(), fitx1x2x3x4.lm(), 
             "x1")
     })
@@ -318,6 +323,20 @@ shinyServer(function(input, output) {
             theme_bw()
     })
     
+    output$resPlot.x1 <- renderPlot({
+        ggplot(data= EstsAndCIs.x1(),
+            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
+            scale_colour_manual("Model", values= my.colorscale.3, guide= FALSE) +
+            geom_linerange(size= 1.5) +
+            geom_point(size= 2.5, shape= 15) +
+            xlab("Model") +
+            ylab("Beta or OR, with 95% CI") +
+            theme_bw() +
+            theme(strip.text.x = element_text(size = 14)) +
+            theme(axis.title.x = element_text(size = 14)) +
+            theme(axis.title.y = element_text(size = 14)) +
+            facet_wrap(~ Type, ncol= 2)
+    })
     
     output$predPlot.x1 <- renderPlot({
         ggplot(data= stackedPredDat(),
@@ -329,11 +348,33 @@ shinyServer(function(input, output) {
             geom_ribbon(colour= NA, alpha= 0.5) +
             geom_line(size= 1.5) +
             xlab("x1") +
-            ylab("Predicted probability, with other continuous covariate(s) fixed") +
+            ylab("Predicted probability, with 95% CI") +
             ylim(-0.2, 1.2) +
             theme_bw() +
+            theme(strip.text.x = element_text(size = 14)) +
+            theme(axis.title.x = element_text(size = 14)) +
+            theme(axis.title.y = element_text(size = 14)) +
             facet_wrap(~ Type, ncol= 2)
     })
+
+    output$aveMargDiffPlot.x1 <- renderPlot({
+        ggplot(data= aveMargDiffs.x1(),
+            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit,
+                linetype= xd, shape= xd)) +
+            scale_colour_manual("Model", values= my.colorscale.3, guide= FALSE) +
+            geom_linerange(size= 1.5) +
+            geom_point(size= 2.5) +
+            scale_linetype_manual("xd", values= c('solid', 'dotted')) +
+            xlab("Model") +
+            ylab("Average marginal effect, with 95% CI") +
+            theme_bw() +
+            theme(strip.text.x = element_text(size = 14)) +
+            theme(axis.title.x = element_text(size = 14)) +
+            theme(axis.title.y = element_text(size = 14)) +
+            facet_wrap(~ Type, ncol= 2)
+    })
+    
+    # not currently using this one
     output$predPlot.xd <- renderPlot({
         mydat <- stackedPredDat() %>%
             group_by(Type, fit, xd) %>%
@@ -354,18 +395,6 @@ shinyServer(function(input, output) {
             theme_bw() +
             facet_wrap(~ Type, ncol= 2)
     })
-
-    output$resPlot.x1 <- renderPlot({
-        ggplot(data= EstsAndCIs.x1(),
-            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
-            scale_colour_manual("Model", values= my.colorscale.3) +
-            geom_pointrange(size= 1) +
-            xlab(NULL) +
-            ylab("Beta or OR for x1, with 95% CI") +
-            theme_bw() +
-            facet_wrap(~ Type, ncol= 2)
-    })
-    
     # not currently using this one
     output$resPlot.xd <- renderPlot({
         ggplot(data= EstsAndCIs.xd(),
@@ -377,18 +406,7 @@ shinyServer(function(input, output) {
             theme_bw() +
             facet_wrap(~ Type, ncol= 2)
     })
-
-    output$aveMargDiffPlot.x1 <- renderPlot({
-        ggplot(data= aveMargDiffs.x1(),
-            mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
-            scale_colour_manual("Model", values= my.colorscale.3) +
-            geom_pointrange(size= 1) +
-            xlab(NULL) +
-            ylab("Average marginal (incremental) effect for x1, with 95% CI") +
-            theme_bw() +
-            facet_wrap(~ Type, ncol= 2)
-    })
-    
+    # not currently using this one
     output$aveMargDiffPlot.xd <- renderPlot({
         ggplot(data= aveMargDiffs.xd(),
             mapping= aes(x= fit, y= Est, ymin= LB, ymax= UB, colour= fit)) +
