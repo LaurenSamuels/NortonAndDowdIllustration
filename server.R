@@ -14,6 +14,7 @@ library(margins)
 shinyServer(function(input, output) {
 
     Z975 <- qnorm(0.975)
+    n <- 10^4
     
     # Color scales
     # CB-friendly, from colorbrewer2
@@ -29,19 +30,21 @@ shinyServer(function(input, output) {
     mysd <- reactive(input$errSD)
     myproptx <- reactive(input$propTx)
     
+    #myseed <- reactive(input$link)
     mylink <- reactive(
         "logit"    
     )
     
     b0  <- reactive(input$beta0)
-    # From N&D p12, footnote to table 1
+    # From N&D p12, footnote to table 1; 
+    # creating as reactive in case I ever want to have them
+    #    changeable
     bd  <- reactive(0.5)
     b1  <- reactive(1)
     b2  <- reactive(2)
     b3  <- reactive(1)
     b4  <- reactive(3)
     
-    n <- 10^4
     
     dat <- reactive({
         # Take care of the random seed.
@@ -320,6 +323,11 @@ shinyServer(function(input, output) {
             geom_vline(xintercept= 0, colour= "red") +
             xlab("Y* (underlying continuous variable)") +
             xlim(-35, 35) +
+            theme(strip.text.x = element_text(size = 14)) +
+            theme(axis.title.x = element_text(size = 14)) +
+            theme(axis.title.y = element_text(size = 14)) +
+            theme(axis.text.x = element_text(size = 12)) +
+            theme(axis.text.y = element_text(size = 12)) +
             theme_bw()
     })
     
@@ -335,6 +343,8 @@ shinyServer(function(input, output) {
             theme(strip.text.x = element_text(size = 14)) +
             theme(axis.title.x = element_text(size = 14)) +
             theme(axis.title.y = element_text(size = 14)) +
+            theme(axis.text.x = element_text(size = 12)) +
+            theme(axis.text.y = element_text(size = 12)) +
             facet_wrap(~ Type, ncol= 2)
     })
     
@@ -350,10 +360,14 @@ shinyServer(function(input, output) {
             xlab("x1") +
             ylab("Predicted probability, with 95% CI") +
             ylim(-0.2, 1.2) +
+            geom_hline(yintercept= 0, size= 0.5, linetype= "dotted") +
+            geom_hline(yintercept= 1, size= 0.5, linetype= "dotted") +
             theme_bw() +
             theme(strip.text.x = element_text(size = 14)) +
             theme(axis.title.x = element_text(size = 14)) +
             theme(axis.title.y = element_text(size = 14)) +
+            theme(axis.text.x = element_text(size = 12)) +
+            theme(axis.text.y = element_text(size = 12)) +
             facet_wrap(~ Type, ncol= 2)
     })
 
@@ -371,6 +385,8 @@ shinyServer(function(input, output) {
             theme(strip.text.x = element_text(size = 14)) +
             theme(axis.title.x = element_text(size = 14)) +
             theme(axis.title.y = element_text(size = 14)) +
+            theme(axis.text.x = element_text(size = 12)) +
+            theme(axis.text.y = element_text(size = 12)) +
             facet_wrap(~ Type, ncol= 2)
     })
     
