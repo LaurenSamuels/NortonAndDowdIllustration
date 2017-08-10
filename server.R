@@ -11,7 +11,7 @@ shinyServer(function(input, output) {
     
     # Color scales
     # CB-friendly, from colorbrewer2
-    my.colorscale.2 <- c("#7570b3", "#d95f02")
+    my.colourscale.2 <- c("#7570b3", "#d95f02")
     my.colorscale.3 <- c("#d95f02", "#1b9e77", "#7570b3")
     my.colorscale.4 <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c')
     
